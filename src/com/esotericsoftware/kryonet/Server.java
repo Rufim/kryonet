@@ -58,6 +58,7 @@ public class Server implements EndPoint {
 	private Object updateLock = new Object();
 	private Thread updateThread;
 	private ServerDiscoveryHandler discoveryHandler;
+	private volatile Exception lastServerException;
 
 	private Listener dispatchListener = new Listener() {
 		public void connected (Connection connection) {
@@ -390,7 +391,13 @@ public class Server implements EndPoint {
 				update(250);
 			} catch (IOException ex) {
 				if (ERROR) error("kryonet", "Error updating server connections.", ex);
+				lastServerException = ex;
 				close();
+			} catch (RuntimeException ex) {
+				if (ERROR) error("kryonet", "Some unexpected server error", ex);
+				lastServerException = ex;
+				close();
+//				shutdown = true;
 			}
 		}
 		if (TRACE) trace("kryonet", "Server thread stopped.");
@@ -596,5 +603,9 @@ public class Server implements EndPoint {
 	/** Returns the current connections. The array returned should not be modified. */
 	public Connection[] getConnections () {
 		return connections;
+	}
+
+	public Exception getLastServerException() {
+		return lastServerException;
 	}
 }

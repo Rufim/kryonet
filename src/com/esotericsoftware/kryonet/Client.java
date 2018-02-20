@@ -31,11 +31,7 @@ import java.nio.channels.CancelledKeyException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.security.AccessControlException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryonet.FrameworkMessage.DiscoverHost;
@@ -263,8 +259,16 @@ public class Client extends Connection implements EndPoint {
 			synchronized (keys) {
 				for (Iterator<SelectionKey> iter = keys.iterator(); iter.hasNext();) {
 					keepAlive();
-					SelectionKey selectionKey = iter.next();
-					iter.remove();
+					SelectionKey selectionKey = null;
+					try {
+						if (iter.hasNext()) {
+							selectionKey = iter.next();
+							iter.remove();
+						}
+					} catch (ConcurrentModificationException ex) {
+						throw new KryoNetException(ex);
+//						return;
+					}
 					try {
 						int ops = selectionKey.readyOps();
 						if ((ops & SelectionKey.OP_READ) == SelectionKey.OP_READ) {
@@ -376,7 +380,11 @@ public class Client extends Connection implements EndPoint {
 						error("kryonet", "Error updating connection.", ex);
 				}
 				close();
-				throw ex;
+//				throw ex;
+			} catch (RuntimeException ex) {
+				error("kryonet", "Some unexpected client error", ex);
+				lastProtocolError = new KryoNetException(ex);
+				close();
 			}
 		}
 		if (TRACE) trace("kryonet", "Client thread stopped.");
